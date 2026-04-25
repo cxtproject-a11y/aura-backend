@@ -7,7 +7,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-const OPENROUTER_API_KEY = "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"; // 🔥 coloque sua chave
+// 🔐 usa variável de ambiente (Railway)
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 function shouldSearch(message) {
   const keywords = [
@@ -22,9 +23,6 @@ function shouldSearch(message) {
 
 app.post("/chat", async (req, res) => {
   const { message } = req.body;
-
-  res.setHeader("Content-Type", "text/plain");
-  res.setHeader("Transfer-Encoding", "chunked");
 
   let context = "";
 
@@ -57,44 +55,29 @@ Pergunta: ${message}
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        stream: true
+        messages: [{ role: "user", content: prompt }]
       })
     });
 
-    for await (const chunk of response.body) {
-      const str = chunk.toString();
+    const data = await response.json();
 
-      const lines = str.split("\n");
+    const reply = data?.choices?.[0]?.message?.content;
 
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const json = line.replace("data: ", "").trim();
-
-          if (json === "[DONE]") {
-            res.end();
-            return;
-          }
-
-          try {
-            const parsed = JSON.parse(json);
-            const content = parsed.choices?.[0]?.delta?.content;
-
-            if (content) {
-              res.write(content);
-            }
-          } catch {}
-        }
-      }
+    if (!reply) {
+      return res.status(500).send("❌ Erro ao gerar resposta.");
     }
+
+    res.send(reply);
 
   } catch (err) {
     console.log("Erro na IA:", err);
-    res.write("\n❌ Erro na IA.");
-    res.end();
+    res.status(500).send("❌ Erro na IA.");
   }
 });
 
-app.listen(3000, "0.0.0.0", () => {
-  console.log("🔥 Backend rodando em http://localhost:3000");
+// 🔥 porta dinâmica (Railway exige isso)
+const PORT = process.env.PORT || 3000;
+
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🔥 Backend rodando na porta ${PORT}`);
 });
