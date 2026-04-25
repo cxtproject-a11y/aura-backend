@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 2.0");
+console.log("🚀 NOVA VERSÃO ATIVA 3.0");
 
 import express from "express";
 import cors from "cors";
@@ -23,23 +23,16 @@ function shouldSearch(messages) {
 
   const text = lastUserMessage.content.toLowerCase().trim();
 
-  // ❌ ignora mensagens simples
   const simpleMessages = [
     "oi", "olá", "ola", "hey", "eai",
     "bom dia", "boa tarde", "boa noite",
     "tudo bem", "blz"
   ];
 
-  if (simpleMessages.includes(text)) {
-    return false;
-  }
+  if (simpleMessages.includes(text)) return false;
 
-  // ❌ ignora perguntas que a IA já sabe responder
-  if (text.includes("o que é") || text.includes("explique")) {
-    return false;
-  }
+  if (text.includes("o que é") || text.includes("explique")) return false;
 
-  // ✅ ativa busca só quando necessário
   const triggers = [
     "quanto", "qual", "quem", "quando",
     "preço", "cotação", "valor",
@@ -55,9 +48,41 @@ app.get("/", (req, res) => {
   res.send("Servidor online 🚀");
 });
 
+// 🔥 TESTE FIRESTORE
+app.get("/test", async (req, res) => {
+  try {
+    await db.collection("test").doc("ok").set({
+      status: "funcionando"
+    });
+
+    res.send("🔥 Firestore OK");
+  } catch (e) {
+    console.log(e);
+    res.send("❌ erro Firestore");
+  }
+});
+
+// 🔥 carregar memória
+async function loadUserMemory(userId) {
+  const doc = await db.collection("chats").doc(userId).get();
+  return doc.exists ? doc.data().messages : [];
+}
+
+// 🔥 salvar memória
+async function saveUserMemory(userId, messages) {
+  await db.collection("chats").doc(userId).set({
+    messages: messages
+  });
+}
+
+// 🔥 CHAT PRINCIPAL
 app.post("/chat", async (req, res) => {
 
-  const messages = req.body?.messages;
+  const { userId, messages } = req.body;
+
+  if (!userId) {
+    return res.status(400).send("❌ userId obrigatório.");
+  }
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).send("❌ Histórico inválido.");
@@ -67,9 +92,16 @@ app.post("/chat", async (req, res) => {
     return res.status(500).send("❌ API KEY não configurada.");
   }
 
-  let finalMessages = [...messages];
-
   try {
+
+    // 🔥 pega memória do usuário
+    let userHistory = await loadUserMemory(userId);
+
+    // junta com mensagens atuais
+    userHistory = [...userHistory, ...messages];
+
+    // limita histórico
+    userHistory = userHistory.slice(-10);
 
     const lastUserMessage = [...messages]
       .reverse()
@@ -77,7 +109,9 @@ app.post("/chat", async (req, res) => {
 
     console.log("📩 Última mensagem:", lastUserMessage);
 
-    // 🔥 decisão inteligente
+    let finalMessages = [...userHistory];
+
+    // 🔥 busca inteligente
     if (shouldSearch(messages)) {
 
       console.log("🔎 Fazendo busca:", lastUserMessage);
@@ -105,24 +139,12 @@ DADOS:
 ${context}`
         });
 
-      } else {
-        console.log("⚠️ Busca vazia");
-
-        finalMessages.unshift({
-          role: "system",
-          content: "Responda normalmente com seu conhecimento."
-        });
       }
-
     } else {
       console.log("🧠 Sem necessidade de busca");
     }
 
-  } catch (e) {
-    console.log("❌ Erro na busca:", e);
-  }
-
-  try {
+    // 🔥 chamada IA
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -142,12 +164,18 @@ ${context}`
     let reply = data?.choices?.[0]?.message?.content;
 
     if (!reply) {
-      if (data?.error?.message) {
-        reply = "❌ Erro da IA: " + data.error.message;
-      } else {
-        reply = "⚠️ IA não respondeu corretamente.";
-      }
+      reply = data?.error?.message
+        ? "❌ Erro da IA: " + data.error.message
+        : "⚠️ IA não respondeu corretamente.";
     }
+
+    // 🔥 salva resposta na memória
+    userHistory.push({
+      role: "assistant",
+      content: reply
+    });
+
+    await saveUserMemory(userId, userHistory);
 
     res.send(reply);
 
