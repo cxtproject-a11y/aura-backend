@@ -10,9 +10,16 @@ app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// 🔥 detectar quando usar internet
+// 🔥 detectar quando usar internet (CORRIGIDO)
 function shouldSearch(messages) {
-  const lastMessage = messages[messages.length - 1]?.content.toLowerCase();
+
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find(m => m.role === "user");
+
+  if (!lastUserMessage) return false;
+
+  const text = lastUserMessage.content.toLowerCase();
 
   const keywords = [
     "hoje", "agora", "preço", "cotação",
@@ -20,7 +27,7 @@ function shouldSearch(messages) {
     "bitcoin", "dólar", "ethereum"
   ];
 
-  return keywords.some(k => lastMessage.includes(k));
+  return keywords.some(k => text.includes(k));
 }
 
 // 🔥 rota raiz
@@ -44,24 +51,34 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 SE PRECISAR DE INTERNET
+    // 🔥 BUSCA INTELIGENTE
     if (shouldSearch(messages)) {
 
-      const lastUserMessage = messages[messages.length - 1].content;
+      const lastUserMessage = [...messages]
+        .reverse()
+        .find(m => m.role === "user")?.content;
 
       console.log("🔎 Fazendo busca:", lastUserMessage);
 
       const results = await searchDuck(lastUserMessage);
 
-      const context = results.map(r =>
-        `${r.title}: ${r.snippet}`
-      ).join("\n\n");
+      console.log("RESULTADOS:", results);
 
-      // 🔥 injeta no contexto da IA
-      finalMessages.unshift({
-        role: "system",
-        content: `Use estas informações da internet:\n\n${context}`
-      });
+      if (results && results.length > 0) {
+
+        const context = results.map(r =>
+          `${r.title}: ${r.snippet}`
+        ).join("\n\n");
+
+        // 🔥 força IA usar dados da internet
+        finalMessages.unshift({
+          role: "system",
+          content: `Você TEM acesso à internet. Use APENAS essas informações atualizadas para responder com precisão. NÃO diga que não tem acesso a dados em tempo real.\n\n${context}`
+        });
+
+      } else {
+        console.log("⚠️ Busca não retornou resultados");
+      }
     }
 
   } catch (e) {
