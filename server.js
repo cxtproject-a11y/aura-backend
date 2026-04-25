@@ -17,13 +17,13 @@ app.get("/", (req, res) => {
 
 app.post("/chat", async (req, res) => {
 
-  const message = req.body?.message;
+  // 🔥 AGORA RECEBE HISTÓRICO
+  const messages = req.body?.messages;
 
-  if (!message) {
-    return res.status(400).send("❌ Mensagem não enviada corretamente.");
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).send("❌ Histórico inválido.");
   }
 
-  // 🔥 DEBUG DA API KEY
   console.log("API KEY:", OPENROUTER_API_KEY);
 
   if (!OPENROUTER_API_KEY) {
@@ -39,21 +39,17 @@ app.post("/chat", async (req, res) => {
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
-        messages: [
-          { role: "user", content: message }
-        ]
+        messages: messages // 🔥 ENVIA HISTÓRICO COMPLETO
       })
     });
 
     const data = await response.json();
 
-    // 🔥 DEBUG COMPLETO DA IA
     console.log("Resposta IA COMPLETA:", JSON.stringify(data));
 
     let reply = data?.choices?.[0]?.message?.content;
 
     if (!reply) {
-
       if (data?.error?.message) {
         reply = "❌ Erro da IA: " + data.error.message;
       } else {
