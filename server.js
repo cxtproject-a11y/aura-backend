@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 5.0");
+console.log("🚀 NOVA VERSÃO ATIVA 6.0");
 
 import express from "express";
 import cors from "cors";
@@ -23,14 +23,19 @@ async function getDB() {
   return db;
 }
 
-// 🔥 FUNÇÃO DE BUSCA CORRIGIDA (AGORA FUNCIONA DE VERDADE)
+// 🔥 PEGA A ÚLTIMA MENSAGEM REAL DO USUÁRIO (CORREÇÃO DO BUG)
+function getLastUserMessage(messages) {
+  return [...messages].reverse().find(m => m.role === "user");
+}
+
+// 🔥 FUNÇÃO DE BUSCA CORRIGIDA
 function shouldSearch(messages) {
 
-  const lastMessage = messages[messages.length - 1];
+  const lastUserMessage = getLastUserMessage(messages);
 
-  if (!lastMessage || lastMessage.role !== "user") return false;
+  if (!lastUserMessage) return false;
 
-  const text = lastMessage.content.toLowerCase().trim();
+  const text = lastUserMessage.content.toLowerCase().trim();
 
   const simpleMessages = [
     "oi", "olá", "ola", "hey", "eai",
@@ -112,9 +117,10 @@ app.post("/chat", async (req, res) => {
     userHistory = [...userHistory, ...messages];
     userHistory = userHistory.slice(-10);
 
-    const lastUserMessage = messages[messages.length - 1]?.content;
+    const lastUser = getLastUserMessage(messages);
+    const lastUserMessage = lastUser?.content;
 
-    console.log("📩 Última mensagem:", lastUserMessage);
+    console.log("📩 Última mensagem real:", lastUserMessage);
 
     let finalMessages = [...userHistory];
 
