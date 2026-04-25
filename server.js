@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 4.0");
+console.log("🚀 NOVA VERSÃO ATIVA 5.0");
 
 import express from "express";
 import cors from "cors";
@@ -23,16 +23,14 @@ async function getDB() {
   return db;
 }
 
-// 🔥 função inteligente de busca
+// 🔥 FUNÇÃO DE BUSCA CORRIGIDA (AGORA FUNCIONA DE VERDADE)
 function shouldSearch(messages) {
 
-  const lastUserMessage = [...messages]
-    .reverse()
-    .find(m => m.role === "user");
+  const lastMessage = messages[messages.length - 1];
 
-  if (!lastUserMessage) return false;
+  if (!lastMessage || lastMessage.role !== "user") return false;
 
-  const text = lastUserMessage.content.toLowerCase().trim();
+  const text = lastMessage.content.toLowerCase().trim();
 
   const simpleMessages = [
     "oi", "olá", "ola", "hey", "eai",
@@ -42,13 +40,12 @@ function shouldSearch(messages) {
 
   if (simpleMessages.includes(text)) return false;
 
-  if (text.includes("o que é") || text.includes("explique")) return false;
-
   const triggers = [
     "quanto", "qual", "quem", "quando",
     "preço", "cotação", "valor",
     "dólar", "bitcoin", "ethereum",
-    "notícia", "resultado", "hoje", "agora"
+    "notícia", "resultado",
+    "hoje", "agora", "último", "atual"
   ];
 
   return triggers.some(t => text.includes(t));
@@ -115,15 +112,13 @@ app.post("/chat", async (req, res) => {
     userHistory = [...userHistory, ...messages];
     userHistory = userHistory.slice(-10);
 
-    const lastUserMessage = [...messages]
-      .reverse()
-      .find(m => m.role === "user")?.content;
+    const lastUserMessage = messages[messages.length - 1]?.content;
 
     console.log("📩 Última mensagem:", lastUserMessage);
 
     let finalMessages = [...userHistory];
 
-    // 🔥 busca inteligente
+    // 🔥 BUSCA REAL FUNCIONANDO
     if (shouldSearch(messages)) {
 
       console.log("🔎 Fazendo busca:", lastUserMessage);
@@ -140,16 +135,17 @@ app.post("/chat", async (req, res) => {
 
         finalMessages.unshift({
           role: "system",
-          content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas.
+          content: `Você tem acesso à internet.
 
-REGRAS:
-- NÃO diga que não tem acesso a dados em tempo real
-- USE os dados abaixo obrigatoriamente
-- Seja direto
+Use obrigatoriamente os dados abaixo se forem relevantes.
+Nunca diga que não tem acesso a dados em tempo real.
 
-DADOS:
+DADOS ATUALIZADOS:
 ${context}`
         });
+
+      } else {
+        console.log("⚠️ Busca não retornou dados");
       }
 
     } else {
