@@ -2,7 +2,6 @@ console.log("🚀 NOVA VERSÃO ATIVA 2.0");
 
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
 import { searchDuck } from "./search.js";
 
 const app = express();
