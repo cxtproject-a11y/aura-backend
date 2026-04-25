@@ -3,6 +3,7 @@ console.log("🚀 NOVA VERSÃO ATIVA 2.0");
 import express from "express";
 import cors from "cors";
 import { searchDuck } from "./search.js";
+import { db } from "./firebase.js";
 
 const app = express();
 
