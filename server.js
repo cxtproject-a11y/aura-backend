@@ -77,15 +77,26 @@ Pergunta: ${message}
 
     const data = await response.json();
 
-    // 🔥 DEBUG COMPLETO
-    console.log("Resposta IA:", JSON.stringify(data));
+    // 🔥 DEBUG COMPLETO (IMPORTANTE)
+    console.log("Resposta IA COMPLETA:", JSON.stringify(data));
 
-    const reply = data?.choices?.[0]?.message?.content;
+    let reply = data?.choices?.[0]?.message?.content;
 
-    // 🔥 TRATAMENTO SE A IA FALHAR
+    // 🔥 fallback inteligente
     if (!reply) {
-      console.log("❌ Resposta inválida da IA:", JSON.stringify(data));
-      return res.send("⚠️ A IA não conseguiu responder agora. Tente novamente.");
+
+      // tenta outro formato
+      reply = data?.choices?.[0]?.text;
+
+      // erro da API
+      if (!reply && data?.error?.message) {
+        reply = "❌ Erro da IA: " + data.error.message;
+      }
+
+      // fallback final
+      if (!reply) {
+        reply = "⚠️ A IA não respondeu corretamente. Tente novamente.";
+      }
     }
 
     res.send(reply);
