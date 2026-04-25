@@ -7,7 +7,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔐 usa variável de ambiente (Railway)
+// 🔐 variável de ambiente (Railway)
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
 function shouldSearch(message) {
@@ -22,7 +22,18 @@ function shouldSearch(message) {
 }
 
 app.post("/chat", async (req, res) => {
-  const { message } = req.body;
+
+  // 🔥 CORREÇÃO PRINCIPAL
+  const message = req.body?.message;
+
+  if (!message) {
+    return res.status(400).send("❌ Mensagem não enviada corretamente.");
+  }
+
+  if (!OPENROUTER_API_KEY) {
+    console.log("❌ API KEY não definida");
+    return res.status(500).send("Erro de configuração do servidor.");
+  }
 
   let context = "";
 
@@ -61,9 +72,12 @@ Pergunta: ${message}
 
     const data = await response.json();
 
+    console.log("Resposta IA:", JSON.stringify(data)); // 🔥 debug
+
     const reply = data?.choices?.[0]?.message?.content;
 
     if (!reply) {
+      console.log("❌ Resposta inválida da IA");
       return res.status(500).send("❌ Erro ao gerar resposta.");
     }
 
@@ -75,7 +89,7 @@ Pergunta: ${message}
   }
 });
 
-// 🔥 porta dinâmica (Railway exige isso)
+// 🔥 porta dinâmica (Railway)
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
