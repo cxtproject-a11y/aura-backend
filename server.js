@@ -1,14 +1,27 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
+import { searchDuck } from "./search.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// 🔐 variável de ambiente
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// 🔥 detectar quando usar internet
+function shouldSearch(messages) {
+  const lastMessage = messages[messages.length - 1]?.content.toLowerCase();
+
+  const keywords = [
+    "hoje", "agora", "preço", "cotação",
+    "notícia", "último", "resultado",
+    "bitcoin", "dólar", "ethereum"
+  ];
+
+  return keywords.some(k => lastMessage.includes(k));
+}
 
 // 🔥 rota raiz
 app.get("/", (req, res) => {
@@ -17,17 +30,42 @@ app.get("/", (req, res) => {
 
 app.post("/chat", async (req, res) => {
 
-  // 🔥 AGORA RECEBE HISTÓRICO
   const messages = req.body?.messages;
 
   if (!messages || !Array.isArray(messages)) {
     return res.status(400).send("❌ Histórico inválido.");
   }
 
-  console.log("API KEY:", OPENROUTER_API_KEY);
-
   if (!OPENROUTER_API_KEY) {
     return res.status(500).send("❌ API KEY não configurada.");
+  }
+
+  let finalMessages = [...messages];
+
+  try {
+
+    // 🔥 SE PRECISAR DE INTERNET
+    if (shouldSearch(messages)) {
+
+      const lastUserMessage = messages[messages.length - 1].content;
+
+      console.log("🔎 Fazendo busca:", lastUserMessage);
+
+      const results = await searchDuck(lastUserMessage);
+
+      const context = results.map(r =>
+        `${r.title}: ${r.snippet}`
+      ).join("\n\n");
+
+      // 🔥 injeta no contexto da IA
+      finalMessages.unshift({
+        role: "system",
+        content: `Use estas informações da internet:\n\n${context}`
+      });
+    }
+
+  } catch (e) {
+    console.log("Erro na busca:", e);
   }
 
   try {
@@ -39,13 +77,13 @@ app.post("/chat", async (req, res) => {
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
-        messages: messages // 🔥 ENVIA HISTÓRICO COMPLETO
+        messages: finalMessages
       })
     });
 
     const data = await response.json();
 
-    console.log("Resposta IA COMPLETA:", JSON.stringify(data));
+    console.log("Resposta IA:", JSON.stringify(data));
 
     let reply = data?.choices?.[0]?.message?.content;
 
