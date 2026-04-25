@@ -1,28 +1,16 @@
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
-import { searchDuck } from "./search.js";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-// 🔐 variável de ambiente (Railway)
+// 🔐 variável de ambiente
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-function shouldSearch(message) {
-  const keywords = [
-    "quem é", "o que é", "notícia",
-    "hoje", "2026", "preço", "resultado"
-  ];
-
-  return keywords.some(k =>
-    message.toLowerCase().includes(k)
-  );
-}
-
-// 🔥 rota raiz (teste)
+// 🔥 rota raiz
 app.get("/", (req, res) => {
   res.send("Servidor online 🚀");
 });
@@ -35,32 +23,12 @@ app.post("/chat", async (req, res) => {
     return res.status(400).send("❌ Mensagem não enviada corretamente.");
   }
 
+  // 🔥 DEBUG DA API KEY
+  console.log("API KEY:", OPENROUTER_API_KEY);
+
   if (!OPENROUTER_API_KEY) {
-    console.log("❌ API KEY não definida");
-    return res.status(500).send("Erro de configuração do servidor.");
+    return res.status(500).send("❌ API KEY não configurada.");
   }
-
-  let context = "";
-
-  try {
-    if (shouldSearch(message)) {
-      const results = await searchDuck(message);
-
-      context = results.map(r =>
-        `${r.title}: ${r.snippet}`
-      ).join("\n\n");
-    }
-  } catch (e) {
-    console.log("Erro na busca:", e);
-  }
-
-  const prompt = `
-Use essas informações atualizadas se forem úteis:
-
-${context}
-
-Pergunta: ${message}
-`;
 
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
@@ -71,43 +39,37 @@ Pergunta: ${message}
       },
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }]
+        messages: [
+          { role: "user", content: message }
+        ]
       })
     });
 
     const data = await response.json();
 
-    // 🔥 DEBUG COMPLETO (IMPORTANTE)
+    // 🔥 DEBUG COMPLETO DA IA
     console.log("Resposta IA COMPLETA:", JSON.stringify(data));
 
     let reply = data?.choices?.[0]?.message?.content;
 
-    // 🔥 fallback inteligente
     if (!reply) {
 
-      // tenta outro formato
-      reply = data?.choices?.[0]?.text;
-
-      // erro da API
-      if (!reply && data?.error?.message) {
+      if (data?.error?.message) {
         reply = "❌ Erro da IA: " + data.error.message;
-      }
-
-      // fallback final
-      if (!reply) {
-        reply = "⚠️ A IA não respondeu corretamente. Tente novamente.";
+      } else {
+        reply = "⚠️ IA não respondeu corretamente.";
       }
     }
 
     res.send(reply);
 
   } catch (err) {
-    console.log("Erro na IA:", err);
-    res.status(500).send("❌ Erro na IA.");
+    console.log("Erro geral:", err);
+    res.status(500).send("❌ Erro no servidor.");
   }
 });
 
-// 🔥 porta dinâmica (Railway)
+// 🔥 porta Railway
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
