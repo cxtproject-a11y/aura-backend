@@ -37,7 +37,7 @@ app.post("/chat", async (req, res) => {
   let context = "";
 
   try {
-    if (shouldSearch(message)) {
+      if (false) { {
       const results = await searchDuck(message);
 
       context = results.map(r =>
