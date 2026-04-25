@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA");
+console.log("🚀 NOVA VERSÃO ATIVA 2.0");
 
 import express from "express";
 import cors from "cors";
