@@ -1,9 +1,8 @@
-console.log("🚀 NOVA VERSÃO ATIVA 3.0");
+console.log("🚀 NOVA VERSÃO ATIVA 4.0");
 
 import express from "express";
 import cors from "cors";
 import { searchDuck } from "./search.js";
-import { db } from "./firebase.js";
 
 const app = express();
 
@@ -11,6 +10,18 @@ app.use(cors());
 app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// 🔥 Firebase lazy load (evita crash)
+let db = null;
+
+async function getDB() {
+  if (!db) {
+    const firebase = await import("./firebase.js");
+    db = firebase.db;
+    console.log("🔥 Firebase carregado dinamicamente");
+  }
+  return db;
+}
 
 // 🔥 função inteligente de busca
 function shouldSearch(messages) {
@@ -51,6 +62,8 @@ app.get("/", (req, res) => {
 // 🔥 TESTE FIRESTORE
 app.get("/test", async (req, res) => {
   try {
+    const db = await getDB();
+
     await db.collection("test").doc("ok").set({
       status: "funcionando"
     });
@@ -64,12 +77,14 @@ app.get("/test", async (req, res) => {
 
 // 🔥 carregar memória
 async function loadUserMemory(userId) {
+  const db = await getDB();
   const doc = await db.collection("chats").doc(userId).get();
   return doc.exists ? doc.data().messages : [];
 }
 
 // 🔥 salvar memória
 async function saveUserMemory(userId, messages) {
+  const db = await getDB();
   await db.collection("chats").doc(userId).set({
     messages: messages
   });
@@ -94,13 +109,10 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 pega memória do usuário
+    // 🔥 memória do usuário
     let userHistory = await loadUserMemory(userId);
 
-    // junta com mensagens atuais
     userHistory = [...userHistory, ...messages];
-
-    // limita histórico
     userHistory = userHistory.slice(-10);
 
     const lastUserMessage = [...messages]
@@ -138,8 +150,8 @@ REGRAS:
 DADOS:
 ${context}`
         });
-
       }
+
     } else {
       console.log("🧠 Sem necessidade de busca");
     }
@@ -169,7 +181,7 @@ ${context}`
         : "⚠️ IA não respondeu corretamente.";
     }
 
-    // 🔥 salva resposta na memória
+    // 🔥 salva memória
     userHistory.push({
       role: "assistant",
       content: reply
