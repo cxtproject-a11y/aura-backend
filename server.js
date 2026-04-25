@@ -23,7 +23,6 @@ function shouldSearch(message) {
 
 app.post("/chat", async (req, res) => {
 
-  // 🔥 CORREÇÃO PRINCIPAL
   const message = req.body?.message;
 
   if (!message) {
@@ -57,6 +56,10 @@ ${context}
 Pergunta: ${message}
 `;
 
+  // 🔥 TIMEOUT ANTI-TRAVAMENTO
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000); // 15s
+
   try {
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -67,24 +70,34 @@ Pergunta: ${message}
       body: JSON.stringify({
         model: "openai/gpt-4o-mini",
         messages: [{ role: "user", content: prompt }]
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     const data = await response.json();
 
-    console.log("Resposta IA:", JSON.stringify(data)); // 🔥 debug
+    console.log("Resposta IA:", JSON.stringify(data));
 
     const reply = data?.choices?.[0]?.message?.content;
 
     if (!reply) {
       console.log("❌ Resposta inválida da IA");
-      return res.status(500).send("❌ Erro ao gerar resposta.");
+      return res.status(500).send("❌ IA não respondeu corretamente.");
     }
 
     res.send(reply);
 
   } catch (err) {
-    console.log("Erro na IA:", err);
+    clearTimeout(timeout);
+
+    console.log("Erro IA:", err);
+
+    if (err.name === "AbortError") {
+      return res.status(500).send("⚠️ A IA demorou muito para responder.");
+    }
+
     res.status(500).send("❌ Erro na IA.");
   }
 });
