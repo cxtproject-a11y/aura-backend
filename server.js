@@ -1,4 +1,5 @@
 console.log("🚀 NOVA VERSÃO ATIVA");
+
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
@@ -10,6 +11,44 @@ app.use(cors());
 app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+// 🔥 função inteligente de busca
+function shouldSearch(messages) {
+
+  const lastUserMessage = [...messages]
+    .reverse()
+    .find(m => m.role === "user");
+
+  if (!lastUserMessage) return false;
+
+  const text = lastUserMessage.content.toLowerCase().trim();
+
+  // ❌ ignora mensagens simples
+  const simpleMessages = [
+    "oi", "olá", "ola", "hey", "eai",
+    "bom dia", "boa tarde", "boa noite",
+    "tudo bem", "blz"
+  ];
+
+  if (simpleMessages.includes(text)) {
+    return false;
+  }
+
+  // ❌ ignora perguntas que a IA já sabe responder
+  if (text.includes("o que é") || text.includes("explique")) {
+    return false;
+  }
+
+  // ✅ ativa busca só quando necessário
+  const triggers = [
+    "quanto", "qual", "quem", "quando",
+    "preço", "cotação", "valor",
+    "dólar", "bitcoin", "ethereum",
+    "notícia", "resultado", "hoje", "agora"
+  ];
+
+  return triggers.some(t => text.includes(t));
+}
 
 // 🔥 rota raiz
 app.get("/", (req, res) => {
@@ -32,29 +71,30 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 pega última mensagem do usuário
     const lastUserMessage = [...messages]
       .reverse()
       .find(m => m.role === "user")?.content;
 
     console.log("📩 Última mensagem:", lastUserMessage);
 
-    // 🔥 FORÇA BUSCA (SEM ERRO AGORA)
-    console.log("🔎 Fazendo busca:", lastUserMessage);
+    // 🔥 decisão inteligente
+    if (shouldSearch(messages)) {
 
-    const results = await searchDuck(lastUserMessage);
+      console.log("🔎 Fazendo busca:", lastUserMessage);
 
-    console.log("RESULTADOS:", results);
+      const results = await searchDuck(lastUserMessage);
 
-    if (results && results.length > 0) {
+      console.log("RESULTADOS:", results);
 
-      const context = results.map(r =>
-        `${r.title}: ${r.snippet}`
-      ).join("\n\n");
+      if (results && results.length > 0) {
 
-      finalMessages.unshift({
-        role: "system",
-        content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas.
+        const context = results.map(r =>
+          `${r.title}: ${r.snippet}`
+        ).join("\n\n");
+
+        finalMessages.unshift({
+          role: "system",
+          content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas.
 
 REGRAS:
 - NÃO diga que não tem acesso a dados em tempo real
@@ -63,15 +103,19 @@ REGRAS:
 
 DADOS:
 ${context}`
-      });
+        });
+
+      } else {
+        console.log("⚠️ Busca vazia");
+
+        finalMessages.unshift({
+          role: "system",
+          content: "Responda normalmente com seu conhecimento."
+        });
+      }
 
     } else {
-      console.log("⚠️ Busca vazia");
-
-      finalMessages.unshift({
-        role: "system",
-        content: "Responda normalmente com seu conhecimento."
-      });
+      console.log("🧠 Sem necessidade de busca");
     }
 
   } catch (e) {
