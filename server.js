@@ -1,4 +1,13 @@
-console.log("🚀 NOVA VERSÃO ATIVA 6.0");
+console.log("🚀 NOVA VERSÃO ATIVA 7.0");
+
+// 🔥 CAPTURA ERROS GLOBAIS (ESSENCIAL)
+process.on("uncaughtException", (err) => {
+  console.log("💥 ERRO NÃO TRATADO:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.log("💥 PROMISE ERROR:", err);
+});
 
 import express from "express";
 import cors from "cors";
@@ -11,24 +20,30 @@ app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// 🔥 Firebase lazy load (evita crash)
+// 🔥 Firebase lazy load (COM DEBUG)
 let db = null;
 
 async function getDB() {
   if (!db) {
-    const firebase = await import("./firebase.js");
-    db = firebase.db;
-    console.log("🔥 Firebase carregado dinamicamente");
+    try {
+      console.log("🔥 Tentando carregar Firebase...");
+      const firebase = await import("./firebase.js");
+      db = firebase.db;
+      console.log("🔥 Firebase carregado dinamicamente");
+    } catch (e) {
+      console.log("❌ ERRO AO CARREGAR FIREBASE:", e);
+      throw e;
+    }
   }
   return db;
 }
 
-// 🔥 PEGA A ÚLTIMA MENSAGEM REAL DO USUÁRIO (CORREÇÃO DO BUG)
+// 🔥 PEGA ÚLTIMA MENSAGEM DO USER (corrige "digitando...")
 function getLastUserMessage(messages) {
   return [...messages].reverse().find(m => m.role === "user");
 }
 
-// 🔥 FUNÇÃO DE BUSCA CORRIGIDA
+// 🔥 FUNÇÃO DE BUSCA
 function shouldSearch(messages) {
 
   const lastUserMessage = getLastUserMessage(messages);
@@ -72,19 +87,18 @@ app.get("/test", async (req, res) => {
 
     res.send("🔥 Firestore OK");
   } catch (e) {
-    console.log(e);
+    console.log("❌ ERRO FIRESTORE:", e);
     res.send("❌ erro Firestore");
   }
 });
 
-// 🔥 carregar memória
+// 🔥 memória
 async function loadUserMemory(userId) {
   const db = await getDB();
   const doc = await db.collection("chats").doc(userId).get();
   return doc.exists ? doc.data().messages : [];
 }
 
-// 🔥 salvar memória
 async function saveUserMemory(userId, messages) {
   const db = await getDB();
   await db.collection("chats").doc(userId).set({
@@ -111,7 +125,7 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 memória do usuário
+    // 🔥 memória
     let userHistory = await loadUserMemory(userId);
 
     userHistory = [...userHistory, ...messages];
@@ -124,7 +138,7 @@ app.post("/chat", async (req, res) => {
 
     let finalMessages = [...userHistory];
 
-    // 🔥 BUSCA REAL FUNCIONANDO
+    // 🔥 BUSCA
     if (shouldSearch(messages)) {
 
       console.log("🔎 Fazendo busca:", lastUserMessage);
@@ -158,7 +172,7 @@ ${context}`
       console.log("🧠 Sem necessidade de busca");
     }
 
-    // 🔥 chamada IA
+    // 🔥 IA
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -194,7 +208,7 @@ ${context}`
     res.send(reply);
 
   } catch (err) {
-    console.log("❌ Erro geral:", err);
+    console.log("❌ ERRO DETALHADO:", err.stack || err);
     res.status(500).send("❌ Erro no servidor.");
   }
 });
@@ -204,4 +218,5 @@ const PORT = process.env.PORT;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🔥 Backend rodando na porta ${PORT}`);
+  console.log("✅ SERVIDOR INICIOU COMPLETAMENTE");
 });
