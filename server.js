@@ -10,7 +10,7 @@ app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// 🔥 detectar quando usar internet (CORRIGIDO)
+// 🔥 DETECÇÃO INTELIGENTE (MELHORADA)
 function shouldSearch(messages) {
 
   const lastUserMessage = [...messages]
@@ -21,13 +21,23 @@ function shouldSearch(messages) {
 
   const text = lastUserMessage.content.toLowerCase();
 
-  const keywords = [
-    "hoje", "agora", "preço", "cotação",
-    "notícia", "último", "resultado",
-    "bitcoin", "dólar", "ethereum"
+  const triggers = [
+    "quanto tá",
+    "quanto esta",
+    "quanto custa",
+    "valor do",
+    "preço do",
+    "cotação",
+    "dólar",
+    "bitcoin",
+    "ethereum",
+    "hoje",
+    "agora",
+    "notícia",
+    "resultado"
   ];
 
-  return keywords.some(k => text.includes(k));
+  return triggers.some(t => text.includes(t));
 }
 
 // 🔥 rota raiz
@@ -51,12 +61,12 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 BUSCA INTELIGENTE
-    if (shouldSearch(messages)) {
+    const lastUserMessage = [...messages]
+      .reverse()
+      .find(m => m.role === "user")?.content;
 
-      const lastUserMessage = [...messages]
-        .reverse()
-        .find(m => m.role === "user")?.content;
+    // 🔥 FORÇA BUSCA SE DETECTAR OU SE PARECER PERGUNTA DE DADO REAL
+    if (shouldSearch(messages)) {
 
       console.log("🔎 Fazendo busca:", lastUserMessage);
 
@@ -70,14 +80,27 @@ app.post("/chat", async (req, res) => {
           `${r.title}: ${r.snippet}`
         ).join("\n\n");
 
-        // 🔥 força IA usar dados da internet
         finalMessages.unshift({
           role: "system",
-          content: `Você TEM acesso à internet. Use APENAS essas informações atualizadas para responder com precisão. NÃO diga que não tem acesso a dados em tempo real.\n\n${context}`
+          content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas para responder.
+
+REGRAS:
+- NÃO diga que não tem acesso a dados em tempo real
+- USE os dados abaixo obrigatoriamente
+- Seja direto e preciso
+
+DADOS:
+${context}`
         });
 
       } else {
-        console.log("⚠️ Busca não retornou resultados");
+        console.log("⚠️ Busca vazia, tentando fallback...");
+
+        // 🔥 fallback: força resposta mesmo sem dados
+        finalMessages.unshift({
+          role: "system",
+          content: "Responda da melhor forma possível com conhecimento geral."
+        });
       }
     }
 
