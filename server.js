@@ -10,36 +10,6 @@ app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// 🔥 DETECÇÃO INTELIGENTE (MELHORADA)
-function shouldSearch(messages) {
-
-  const lastUserMessage = [...messages]
-    .reverse()
-    .find(m => m.role === "user");
-
-  if (!lastUserMessage) return false;
-
-  const text = lastUserMessage.content.toLowerCase();
-
-  const triggers = [
-    "quanto tá",
-    "quanto esta",
-    "quanto custa",
-    "valor do",
-    "preço do",
-    "cotação",
-    "dólar",
-    "bitcoin",
-    "ethereum",
-    "hoje",
-    "agora",
-    "notícia",
-    "resultado"
-  ];
-
-  return triggers.some(t => text.includes(t));
-}
-
 // 🔥 rota raiz
 app.get("/", (req, res) => {
   res.send("Servidor online 🚀");
@@ -61,51 +31,50 @@ app.post("/chat", async (req, res) => {
 
   try {
 
+    // 🔥 pega última mensagem do usuário
     const lastUserMessage = [...messages]
       .reverse()
       .find(m => m.role === "user")?.content;
 
-    // 🔥 FORÇA BUSCA SE DETECTAR OU SE PARECER PERGUNTA DE DADO REAL
-    if (shouldSearch(messages)) {
+    console.log("📩 Última mensagem:", lastUserMessage);
 
-      console.log("🔎 Fazendo busca:", lastUserMessage);
+    // 🔥 FORÇA BUSCA (SEM ERRO AGORA)
+    console.log("🔎 Fazendo busca:", lastUserMessage);
 
-      const results = await searchDuck(lastUserMessage);
+    const results = await searchDuck(lastUserMessage);
 
-      console.log("RESULTADOS:", results);
+    console.log("RESULTADOS:", results);
 
-      if (results && results.length > 0) {
+    if (results && results.length > 0) {
 
-        const context = results.map(r =>
-          `${r.title}: ${r.snippet}`
-        ).join("\n\n");
+      const context = results.map(r =>
+        `${r.title}: ${r.snippet}`
+      ).join("\n\n");
 
-        finalMessages.unshift({
-          role: "system",
-          content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas para responder.
+      finalMessages.unshift({
+        role: "system",
+        content: `Você TEM acesso à internet e DEVE usar essas informações atualizadas.
 
 REGRAS:
 - NÃO diga que não tem acesso a dados em tempo real
 - USE os dados abaixo obrigatoriamente
-- Seja direto e preciso
+- Seja direto
 
 DADOS:
 ${context}`
-        });
+      });
 
-      } else {
-        console.log("⚠️ Busca vazia, tentando fallback...");
+    } else {
+      console.log("⚠️ Busca vazia");
 
-        // 🔥 fallback: força resposta mesmo sem dados
-        finalMessages.unshift({
-          role: "system",
-          content: "Responda da melhor forma possível com conhecimento geral."
-        });
-      }
+      finalMessages.unshift({
+        role: "system",
+        content: "Responda normalmente com seu conhecimento."
+      });
     }
 
   } catch (e) {
-    console.log("Erro na busca:", e);
+    console.log("❌ Erro na busca:", e);
   }
 
   try {
@@ -123,7 +92,7 @@ ${context}`
 
     const data = await response.json();
 
-    console.log("Resposta IA:", JSON.stringify(data));
+    console.log("🤖 Resposta IA:", JSON.stringify(data));
 
     let reply = data?.choices?.[0]?.message?.content;
 
@@ -138,7 +107,7 @@ ${context}`
     res.send(reply);
 
   } catch (err) {
-    console.log("Erro geral:", err);
+    console.log("❌ Erro geral:", err);
     res.status(500).send("❌ Erro no servidor.");
   }
 });
