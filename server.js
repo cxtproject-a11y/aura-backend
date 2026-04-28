@@ -1,4 +1,4 @@
-console.log("🚀 BACKEND AURA V9.0");
+console.log("🚀 BACKEND AURA V10.0");
 
 // =============================
 // 🔥 ERROS GLOBAIS
@@ -57,7 +57,7 @@ function shouldSearch(messages) {
   const last = getLastUserMessage(messages);
   if (!last) return false;
 
-  const text = last.content.toLowerCase();
+  const text = (last.content || "").toLowerCase();
 
   const simples = ["oi","olá","ola","hey","eai","bom dia","boa tarde","boa noite"];
   if (simples.includes(text)) return false;
@@ -69,6 +69,19 @@ function shouldSearch(messages) {
   ];
 
   return triggers.some(t => text.includes(t));
+}
+
+// =============================
+// 🔥 NORMALIZAÇÃO (CORREÇÃO FINAL)
+// =============================
+function normalizeMessages(messages) {
+  return messages
+    .filter(m => m && typeof m === "object")
+    .map(m => ({
+      role: m.role || "user",
+      content: String(m.content || "")
+    }))
+    .filter(m => m.content.trim().length > 0);
 }
 
 // =============================
@@ -120,7 +133,7 @@ async function saveUserMemory(userId, messages) {
 async function callAI(messages) {
 
   const models = [
-    "openai/gpt-3.5-turbo",            // 🔥 MAIS ESTÁVEL PRIMEIRO
+    "openai/gpt-3.5-turbo",
     "openai/gpt-4o-mini",
     "mistralai/mistral-7b-instruct"
   ];
@@ -146,7 +159,6 @@ async function callAI(messages) {
 
       console.log("📦 RESPOSTA:", JSON.stringify(data));
 
-      // 🔥 SE DER ERRO → TENTA PRÓXIMO MODELO
       if (data?.error) {
         console.log("❌ ERRO DO MODELO:", model, data.error.message);
         continue;
@@ -204,7 +216,10 @@ app.post("/chat", async (req, res) => {
 
     console.log("📩 Última:", lastText);
 
-    let finalMessages = [...userHistory];
+    // 🔥 NORMALIZAÇÃO AQUI (ESSENCIAL)
+    let finalMessages = normalizeMessages(userHistory);
+
+    console.log("📤 ENVIANDO PRA IA:", JSON.stringify(finalMessages, null, 2));
 
     // 🔍 BUSCA
     if (shouldSearch(messages)) {
@@ -226,10 +241,8 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    // 🤖 IA
     const reply = await callAI(finalMessages);
 
-    // salva histórico
     userHistory.push({
       role: "assistant",
       content: reply
