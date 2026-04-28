@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 7.2");
+console.log("🚀 NOVA VERSÃO ATIVA 7.3");
 
 // 🔥 CAPTURA ERROS GLOBAIS
 process.on("uncaughtException", (err) => {
@@ -14,7 +14,7 @@ process.on("unhandledRejection", (err) => {
 // =============================
 import express from "express";
 import cors from "cors";
-import { searchDuck } from "./search.js"; // mantém sua busca
+import { searchDuck } from "./search.js";
 
 const app = express();
 
@@ -87,7 +87,11 @@ async function loadUserMemory(userId) {
 
     const data = doc.data();
 
-    return Array.isArray(data.messages) ? data.messages : [];
+    // 🔥 CORREÇÃO PRINCIPAL AQUI
+    if (Array.isArray(data.messages)) return data.messages;
+    if (Array.isArray(data.chats)) return data.chats;
+
+    return [];
 
   } catch (e) {
     console.log("❌ ERRO LOAD MEMORY:", e);
@@ -175,7 +179,7 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    // 🤖 IA (fetch nativo — SEM node-fetch)
+    // 🤖 IA
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
