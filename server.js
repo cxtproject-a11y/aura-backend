@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 7.3");
+console.log("🚀 NOVA VERSÃO ATIVA 7.4");
 
 // 🔥 CAPTURA ERROS GLOBAIS
 process.on("uncaughtException", (err) => {
@@ -14,6 +14,7 @@ process.on("unhandledRejection", (err) => {
 // =============================
 import express from "express";
 import cors from "cors";
+import fetch from "node-fetch"; // 🔥 IMPORTANTE
 import { searchDuck } from "./search.js";
 
 const app = express();
@@ -21,7 +22,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// 🔥 PEGA API KEY DO RAILWAY
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+
+console.log("🔑 KEY carregada:", OPENROUTER_API_KEY ? "OK" : "❌ NÃO DEFINIDA");
 
 // =============================
 // 🔥 FIREBASE (LAZY LOAD)
@@ -76,7 +80,7 @@ app.get("/", (req, res) => {
 });
 
 // =============================
-// 🗄️ MEMÓRIA (FIRESTORE)
+// 🗄️ MEMÓRIA
 // =============================
 async function loadUserMemory(userId) {
   try {
@@ -87,7 +91,6 @@ async function loadUserMemory(userId) {
 
     const data = doc.data();
 
-    // 🔥 CORREÇÃO PRINCIPAL AQUI
     if (Array.isArray(data.messages)) return data.messages;
     if (Array.isArray(data.chats)) return data.chats;
 
@@ -123,7 +126,7 @@ app.post("/chat", async (req, res) => {
     return res.status(400).send("❌ userId obrigatório.");
   }
 
-  // 🔥 aceita message simples
+  // 🔥 aceita formato simples
   if (!messages && message) {
     messages = [
       { role: "user", content: message }
