@@ -1,6 +1,8 @@
-console.log("🔥 TESTE NOVO BACKEND 999");
+console.log("🚀 BACKEND AURA V8.0");
 
-// 🔥 CAPTURA ERROS GLOBAIS
+// =============================
+// 🔥 ERROS GLOBAIS
+// =============================
 process.on("uncaughtException", (err) => {
   console.log("💥 ERRO NÃO TRATADO:", err);
 });
@@ -14,7 +16,7 @@ process.on("unhandledRejection", (err) => {
 // =============================
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch"; // 🔥 IMPORTANTE
+import fetch from "node-fetch";
 import { searchDuck } from "./search.js";
 
 const app = express();
@@ -22,27 +24,24 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 🔥 PEGA API KEY DO RAILWAY
+// =============================
+// 🔑 API KEY
+// =============================
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-console.log("🔑 KEY carregada:", OPENROUTER_API_KEY ? "OK" : "❌ NÃO DEFINIDA");
+console.log("🔑 KEY:", OPENROUTER_API_KEY ? "OK" : "❌ NÃO DEFINIDA");
 
 // =============================
-// 🔥 FIREBASE (LAZY LOAD)
+// 🔥 FIREBASE (LAZY)
 // =============================
 let db = null;
 
 async function getDB() {
   if (!db) {
-    try {
-      console.log("🔥 Tentando carregar Firebase...");
-      const firebase = await import("./firebase.js");
-      db = firebase.db;
-      console.log("🔥 Firebase carregado");
-    } catch (e) {
-      console.log("❌ ERRO FIREBASE:", e);
-      throw e;
-    }
+    console.log("🔥 Carregando Firebase...");
+    const firebase = await import("./firebase.js");
+    db = firebase.db;
+    console.log("✅ Firebase conectado");
   }
   return db;
 }
@@ -55,10 +54,10 @@ function getLastUserMessage(messages) {
 }
 
 function shouldSearch(messages) {
-  const lastUserMessage = getLastUserMessage(messages);
-  if (!lastUserMessage) return false;
+  const last = getLastUserMessage(messages);
+  if (!last) return false;
 
-  const text = lastUserMessage.content.toLowerCase().trim();
+  const text = last.content.toLowerCase();
 
   const simples = ["oi","olá","ola","hey","eai","bom dia","boa tarde","boa noite"];
   if (simples.includes(text)) return false;
@@ -73,7 +72,7 @@ function shouldSearch(messages) {
 }
 
 // =============================
-// 🌐 ROTA TESTE
+// 🌐 TESTE
 // =============================
 app.get("/", (req, res) => {
   res.send("Servidor online 🚀");
@@ -116,6 +115,53 @@ async function saveUserMemory(userId, messages) {
 }
 
 // =============================
+// 🤖 FUNÇÃO IA COM FALLBACK
+// =============================
+async function callAI(messages) {
+
+  const models = [
+    "openai/gpt-4o-mini",      // principal
+    "openai/gpt-3.5-turbo",    // fallback 1
+    "mistralai/mistral-7b-instruct" // fallback 2
+  ];
+
+  for (let model of models) {
+
+    try {
+      console.log("🤖 Tentando modelo:", model);
+
+      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model: model,
+          messages: messages
+        })
+      });
+
+      const data = await response.json();
+
+      console.log("📦 RESPOSTA:", JSON.stringify(data));
+
+      const reply = data?.choices?.[0]?.message?.content;
+
+      if (reply) {
+        console.log("✅ FUNCIONOU COM:", model);
+        return reply;
+      }
+
+    } catch (err) {
+      console.log("❌ ERRO NO MODELO:", model, err);
+    }
+  }
+
+  return "⚠️ Não consegui responder agora.";
+}
+
+// =============================
 // 💬 CHAT
 // =============================
 app.post("/chat", async (req, res) => {
@@ -126,11 +172,8 @@ app.post("/chat", async (req, res) => {
     return res.status(400).send("❌ userId obrigatório.");
   }
 
-  // 🔥 aceita formato simples
   if (!messages && message) {
-    messages = [
-      { role: "user", content: message }
-    ];
+    messages = [{ role: "user", content: message }];
   }
 
   if (!Array.isArray(messages)) {
@@ -145,17 +188,15 @@ app.post("/chat", async (req, res) => {
 
     let userHistory = await loadUserMemory(userId);
 
-    if (!Array.isArray(userHistory)) {
-      userHistory = [];
-    }
+    if (!Array.isArray(userHistory)) userHistory = [];
 
     userHistory = [...userHistory, ...messages];
     userHistory = userHistory.slice(-10);
 
     const lastUser = getLastUserMessage(messages);
-    const lastUserMessage = lastUser?.content;
+    const lastText = lastUser?.content;
 
-    console.log("📩 Última mensagem:", lastUserMessage);
+    console.log("📩 Última:", lastText);
 
     let finalMessages = [...userHistory];
 
@@ -164,9 +205,9 @@ app.post("/chat", async (req, res) => {
 
       console.log("🔎 Buscando...");
 
-      const results = await searchDuck(lastUserMessage);
+      const results = await searchDuck(lastText);
 
-      if (results && results.length > 0) {
+      if (results?.length) {
 
         const context = results.map(r =>
           `${r.title}: ${r.snippet}`
@@ -174,40 +215,15 @@ app.post("/chat", async (req, res) => {
 
         finalMessages.unshift({
           role: "system",
-          content: `Use os dados abaixo se relevantes:\n\n${context}`
+          content: `Use os dados abaixo:\n\n${context}`
         });
-
-      } else {
-        console.log("⚠️ Sem resultados de busca");
       }
     }
 
-    // 🤖 IA
-    const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-4o-mini",
-        messages: finalMessages
-      })
-    });
+    // 🤖 IA COM FALLBACK
+    const reply = await callAI(finalMessages);
 
-    const data = await response.json();
-
-    console.log("🤖 IA:", JSON.stringify(data));
-
-    let reply = data?.choices?.[0]?.message?.content;
-
-    if (!reply) {
-      reply = data?.error?.message
-        ? "❌ IA erro: " + data.error.message
-        : "⚠️ IA não respondeu.";
-    }
-
-    // 🔥 salva resposta
+    // salva
     userHistory.push({
       role: "assistant",
       content: reply
@@ -229,5 +245,5 @@ app.post("/chat", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🔥 Backend rodando na porta ${PORT}`);
+  console.log(`🔥 Rodando na porta ${PORT}`);
 });
