@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 7.4");
+console.log("🔥 TESTE NOVO BACKEND 999");
 
 // 🔥 CAPTURA ERROS GLOBAIS
 process.on("uncaughtException", (err) => {
