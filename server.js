@@ -1,4 +1,4 @@
-console.log("🚀 NOVA VERSÃO ATIVA 7.1");
+console.log("🚀 NOVA VERSÃO ATIVA 7.2");
 
 // 🔥 CAPTURA ERROS GLOBAIS
 process.on("uncaughtException", (err) => {
@@ -9,10 +9,12 @@ process.on("unhandledRejection", (err) => {
   console.log("💥 PROMISE ERROR:", err);
 });
 
+// =============================
+// 📦 IMPORTS
+// =============================
 import express from "express";
 import cors from "cors";
-import fetch from "node-fetch";
-import { searchDuck } from "./search.js";
+import { searchDuck } from "./search.js"; // mantém sua busca
 
 const app = express();
 
@@ -21,7 +23,9 @@ app.use(express.json());
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 
-// 🔥 Firebase lazy load
+// =============================
+// 🔥 FIREBASE (LAZY LOAD)
+// =============================
 let db = null;
 
 async function getDB() {
@@ -39,12 +43,13 @@ async function getDB() {
   return db;
 }
 
-// 🔥 pega última mensagem do user
+// =============================
+// 🧠 HELPERS
+// =============================
 function getLastUserMessage(messages) {
   return [...messages].reverse().find(m => m.role === "user");
 }
 
-// 🔥 detectar busca
 function shouldSearch(messages) {
   const lastUserMessage = getLastUserMessage(messages);
   if (!lastUserMessage) return false;
@@ -63,12 +68,16 @@ function shouldSearch(messages) {
   return triggers.some(t => text.includes(t));
 }
 
-// 🔥 rota raiz
+// =============================
+// 🌐 ROTA TESTE
+// =============================
 app.get("/", (req, res) => {
   res.send("Servidor online 🚀");
 });
 
-// 🔥 memória (CORRIGIDO)
+// =============================
+// 🗄️ MEMÓRIA (FIRESTORE)
+// =============================
 async function loadUserMemory(userId) {
   try {
     const db = await getDB();
@@ -78,7 +87,6 @@ async function loadUserMemory(userId) {
 
     const data = doc.data();
 
-    // 🔥 GARANTE ARRAY
     return Array.isArray(data.messages) ? data.messages : [];
 
   } catch (e) {
@@ -100,7 +108,9 @@ async function saveUserMemory(userId, messages) {
   }
 }
 
-// 🔥 CHAT PRINCIPAL (BLINDADO)
+// =============================
+// 💬 CHAT
+// =============================
 app.post("/chat", async (req, res) => {
 
   let { userId, messages, message } = req.body;
@@ -109,7 +119,7 @@ app.post("/chat", async (req, res) => {
     return res.status(400).send("❌ userId obrigatório.");
   }
 
-  // 🔥 aceita os dois formatos
+  // 🔥 aceita message simples
   if (!messages && message) {
     messages = [
       { role: "user", content: message }
@@ -126,14 +136,12 @@ app.post("/chat", async (req, res) => {
 
   try {
 
-    // 🔥 memória segura
     let userHistory = await loadUserMemory(userId);
 
     if (!Array.isArray(userHistory)) {
       userHistory = [];
     }
 
-    // 🔥 junta histórico + novas mensagens
     userHistory = [...userHistory, ...messages];
     userHistory = userHistory.slice(-10);
 
@@ -144,7 +152,7 @@ app.post("/chat", async (req, res) => {
 
     let finalMessages = [...userHistory];
 
-    // 🔥 BUSCA
+    // 🔍 BUSCA
     if (shouldSearch(messages)) {
 
       console.log("🔎 Buscando...");
@@ -165,10 +173,9 @@ app.post("/chat", async (req, res) => {
       } else {
         console.log("⚠️ Sem resultados de busca");
       }
-
     }
 
-    // 🔥 CHAMADA IA
+    // 🤖 IA (fetch nativo — SEM node-fetch)
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -209,9 +216,11 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// 🔥 start servidor
-const PORT = process.env.PORT;
+// =============================
+// 🚀 START
+// =============================
+const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🔥 Rodando na porta ${PORT}`);
+  console.log(`🔥 Backend rodando na porta ${PORT}`);
 });
