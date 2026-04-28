@@ -1,4 +1,4 @@
-console.log("🚀 BACKEND AURA V8.0");
+console.log("🚀 BACKEND AURA V9.0");
 
 // =============================
 // 🔥 ERROS GLOBAIS
@@ -115,14 +115,14 @@ async function saveUserMemory(userId, messages) {
 }
 
 // =============================
-// 🤖 FUNÇÃO IA COM FALLBACK
+// 🤖 IA COM FALLBACK REAL
 // =============================
 async function callAI(messages) {
 
   const models = [
-    "openai/gpt-4o-mini",      // principal
-    "openai/gpt-3.5-turbo",    // fallback 1
-    "mistralai/mistral-7b-instruct" // fallback 2
+    "openai/gpt-3.5-turbo",            // 🔥 MAIS ESTÁVEL PRIMEIRO
+    "openai/gpt-4o-mini",
+    "mistralai/mistral-7b-instruct"
   ];
 
   for (let model of models) {
@@ -146,19 +146,25 @@ async function callAI(messages) {
 
       console.log("📦 RESPOSTA:", JSON.stringify(data));
 
+      // 🔥 SE DER ERRO → TENTA PRÓXIMO MODELO
+      if (data?.error) {
+        console.log("❌ ERRO DO MODELO:", model, data.error.message);
+        continue;
+      }
+
       const reply = data?.choices?.[0]?.message?.content;
 
-      if (reply) {
+      if (reply && reply.trim().length > 0) {
         console.log("✅ FUNCIONOU COM:", model);
         return reply;
       }
 
     } catch (err) {
-      console.log("❌ ERRO NO MODELO:", model, err);
+      console.log("❌ EXCEPTION:", model, err);
     }
   }
 
-  return "⚠️ Não consegui responder agora.";
+  return "⚠️ IA indisponível no momento.";
 }
 
 // =============================
@@ -220,10 +226,10 @@ app.post("/chat", async (req, res) => {
       }
     }
 
-    // 🤖 IA COM FALLBACK
+    // 🤖 IA
     const reply = await callAI(finalMessages);
 
-    // salva
+    // salva histórico
     userHistory.push({
       role: "assistant",
       content: reply
@@ -245,5 +251,5 @@ app.post("/chat", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🔥 Rodando na porta ${PORT}`);
+  console.log(`🔥 Backend rodando na porta ${PORT}`);
 });
