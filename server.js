@@ -19,6 +19,15 @@ import cors from "cors";
 import fetch from "node-fetch";
 import { searchDuck } from "./search.js";
 
+// 🔔 FIREBASE ADMIN (ENV)
+import admin from "firebase-admin";
+
+const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
 const app = express();
 
 app.use(cors());
@@ -47,6 +56,24 @@ async function getDB() {
 }
 
 // =============================
+// 🔔 NOTIFICAÇÃO
+// =============================
+async function enviarNotificacao(token, titulo, mensagem) {
+  try {
+    await admin.messaging().send({
+      token: token,
+      notification: {
+        title: titulo,
+        body: mensagem
+      }
+    });
+    console.log("🔔 Notificação enviada");
+  } catch (e) {
+    console.log("❌ Erro notificação:", e);
+  }
+}
+
+// =============================
 // 🧠 HELPERS
 // =============================
 function getLastUserMessage(messages) {
@@ -72,7 +99,7 @@ function shouldSearch(messages) {
 }
 
 // =============================
-// 🔥 NORMALIZAÇÃO (CORREÇÃO FINAL)
+// 🔥 NORMALIZAÇÃO
 // =============================
 function normalizeMessages(messages) {
   return messages
@@ -128,7 +155,7 @@ async function saveUserMemory(userId, messages) {
 }
 
 // =============================
-// 🤖 IA COM FALLBACK REAL
+// 🤖 IA
 // =============================
 async function callAI(messages) {
 
@@ -157,17 +184,11 @@ async function callAI(messages) {
 
       const data = await response.json();
 
-      console.log("📦 RESPOSTA:", JSON.stringify(data));
-
-      if (data?.error) {
-        console.log("❌ ERRO DO MODELO:", model, data.error.message);
-        continue;
-      }
+      if (data?.error) continue;
 
       const reply = data?.choices?.[0]?.message?.content;
 
       if (reply && reply.trim().length > 0) {
-        console.log("✅ FUNCIONOU COM:", model);
         return reply;
       }
 
@@ -184,7 +205,7 @@ async function callAI(messages) {
 // =============================
 app.post("/chat", async (req, res) => {
 
-  let { userId, messages, message } = req.body;
+  let { userId, messages, message, receiverId } = req.body;
 
   if (!userId) {
     return res.status(400).send("❌ userId obrigatório.");
@@ -214,17 +235,9 @@ app.post("/chat", async (req, res) => {
     const lastUser = getLastUserMessage(messages);
     const lastText = lastUser?.content;
 
-    console.log("📩 Última:", lastText);
-
-    // 🔥 NORMALIZAÇÃO AQUI (ESSENCIAL)
     let finalMessages = normalizeMessages(userHistory);
 
-    console.log("📤 ENVIANDO PRA IA:", JSON.stringify(finalMessages, null, 2));
-
-    // 🔍 BUSCA
     if (shouldSearch(messages)) {
-
-      console.log("🔎 Buscando...");
 
       const results = await searchDuck(lastText);
 
@@ -249,6 +262,17 @@ app.post("/chat", async (req, res) => {
     });
 
     await saveUserMemory(userId, userHistory);
+
+    // 🔔 NOTIFICAÇÃO (SEM QUEBRAR NADA)
+    if (receiverId) {
+      const db = await getDB();
+      const doc = await db.collection("profiles").doc(receiverId).get();
+      const token = doc.data()?.fcmToken;
+
+      if (token) {
+        await enviarNotificacao(token, "Nova mensagem", "Você recebeu uma mensagem");
+      }
+    }
 
     res.send(reply);
 
